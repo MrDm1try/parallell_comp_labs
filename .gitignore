@@ -1,3 +1,5 @@
+lab_*/*
+!lab_*/*.*
 .idea/
 *.xlsx
 *.png

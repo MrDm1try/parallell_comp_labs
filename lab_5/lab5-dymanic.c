@@ -28,14 +28,12 @@ typedef struct arg_struct_ {
 
 pthread_t comp_threads[NUMBER_OF_THREADS];
 pthread_t progress_thread;
-static pthread_mutex_t reduce_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
 
 long N;
 long double *M1;
 long double *M2;
 long double *M2_copy;
-
-long check;
 
 long double min;
 double X = 0;
@@ -121,14 +119,15 @@ void *map_M2(void *arguments) {
 void *merge(void *thread_num_id) {
     long *thread_num = (long *) thread_num_id;
     while (1) {
-        if ((check >= N/2) || (*thread_num >= N/2)) {
-            pthread_exit(NULL);
+        usleep(1);
+        if ((*thread_num >= N/2)) {
+            break;
         } else if (*thread_num >= 0) {
-            check++;
             M2[*thread_num] = pow(M1[*thread_num], M2[*thread_num]);
             *thread_num = -1;
         }
     }
+    pthread_exit(NULL);
 }
 
 void *sort(void *arguments) {
@@ -155,9 +154,9 @@ void *reduce(void *arguments) {
         if (isfinite(M2[j]) && (int)(M2[j] / min) % 2 == 0) {
             // remember to convert to radians
             double value_to_add = sinl((M2[j] * M_PI) / 180.0);
-            pthread_mutex_lock(&reduce_mutex);
+            pthread_mutex_lock(&pmutex);
             X += value_to_add;
-            pthread_mutex_unlock(&reduce_mutex);
+            pthread_mutex_unlock(&pmutex);
         }
     }
     pthread_exit(NULL);
@@ -224,11 +223,10 @@ int main(int argc, char* argv[]) {
             thread_indexes[j] = j;
         }
         long next_ind = 6;
-        check = 0;
         for (j = 0; j < NUMBER_OF_THREADS; j++) {
             pthread_create(&comp_threads[j], NULL, merge, (void *)&thread_indexes[j]);
         }
-        while (next_ind < N/2) {
+        while (next_ind < N/2 + NUMBER_OF_THREADS) {
             for (j = 0; j < NUMBER_OF_THREADS; j++) {
                 if (thread_indexes[j] == -1) {
                     thread_indexes[j] = next_ind++;
